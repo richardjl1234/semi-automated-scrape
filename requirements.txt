@@ -7,3 +7,5 @@ playwright>=1.40.0
 # Optional: For enhanced functionality
 pandas>=2.0.0
 openpyxl>=3.1.0  # Excel export
+
+scrapy_playwright
