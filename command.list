@@ -1,0 +1,3 @@
+ rm quotes/.scrapy/*  # remove the cache
+ 
+ scrapy runspider quotes/spiders/quotes_spider.py -o quotes/quotes.json

@@ -41,6 +41,7 @@ logs/
 
 # Project Specific
 cookies.json
+result/**
 quotes.json
 quotes.csv
 quotes.xml

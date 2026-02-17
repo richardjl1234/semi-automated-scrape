@@ -1,19 +1,32 @@
 """
 Cookie Extraction Script for Semi-Automated Scraping
 
+This script is designed to work with any website. Each website should have:
+- A dedicated spider script named {alias}_spider.py
+- A settings folder named {alias}/
+- Cookie file: {alias}/cookies.json
+- Output data file: {alias}.json
+
 Usage:
-    python3 extract_cookies.py <login_url>
+    python3 extract_cookies.py <alias> <login_url>
     
-Example:
-    python3 extract_cookies.py http://quotes.toscrape.com/login
-    python3 extract_cookies.py https://example.com/login
+Arguments:
+    alias       - Website alias (e.g., quotes, example, mysite)
+    login_url   - Full login URL for the target website
+    
+Examples:
+    # For quotes.toscrape.com:
+    python3 extract_cookies.py quotes http://quotes.toscrape.com/login
+    
+    # For any other website:
+    python3 extract_cookies.py mysite https://example.com/login
 
 The script will:
-1. Accept a URL as command line argument (required)
+1. Accept alias and URL as command line arguments
 2. Launch Chrome browser and navigate to the URL
 3. Wait for you to manually login
 4. Extract cookies after login
-5. Save cookies and terminate
+5. Save cookies as {alias}_cookies.json and terminate
 """
 
 import json
@@ -21,18 +34,27 @@ import sys
 import os
 from playwright.sync_api import sync_playwright
 
-# Default cookies file
-COOKIES_FILE = "cookies.json"
 
-
-def extract_cookies(login_url):
-    """Extract cookies from a logged-in browser session"""
+def extract_cookies(alias, login_url):
+    """Extract cookies from a logged-in browser session for a specific website alias"""
     
-    # Validate URL
-    if not login_url:
-        print("❌ Error: No URL provided!")
-        print("\nUsage: python3 extract_cookies.py <login_url>")
-        print("Example: python3 extract_cookies.py http://quotes.toscrape.com/login")
+    # Generate cookies filename based on alias
+    cookies_file = f"{alias}/cookies.json"
+    
+    # Ensure the alias directory exists
+    os.makedirs(alias, exist_ok=True)
+    
+    # Validate alias
+    if not alias:
+        print("❌ Error: No alias provided!")
+        print("\nUsage: python3 extract_cookies.py <alias> <login_url>")
+        print("Example: python3 extract_cookies.py quotes http://quotes.toscrape.com/login")
+        sys.exit(1)
+    
+    # Validate alias format (alphanumeric and underscores only)
+    if not all(c.isalnum() or c == '_' for c in alias):
+        print("❌ Error: Invalid alias format!")
+        print("Alias must contain only alphanumeric characters and underscores.")
         sys.exit(1)
     
     # Validate URL format
@@ -44,7 +66,8 @@ def extract_cookies(login_url):
     print("=" * 60)
     print("🍪 Semi-Automated Cookie Extraction")
     print("=" * 60)
-    print(f"\n🌐 Target URL: {login_url}")
+    print(f"\n🌐 Target Website Alias: {alias}")
+    print(f"📍 Target URL: {login_url}")
     print("\n📋 Instructions:")
     print("1. Browser will open to the login page")
     print("2. Enter your username and password to login")
@@ -88,10 +111,10 @@ def extract_cookies(login_url):
             print("   Make sure you have successfully logged in.")
         
         # Save cookies to file
-        with open(COOKIES_FILE, 'w') as f:
+        with open(cookies_file, 'w') as f:
             json.dump(all_cookies, f, indent=2)
         
-        print(f"\n✅ Cookies saved to: {COOKIES_FILE}")
+        print(f"\n✅ Cookies saved to: {cookies_file}")
         print(f"📊 Total cookies: {len(all_cookies)}")
         
         # Show cookies info
@@ -108,17 +131,18 @@ def extract_cookies(login_url):
         
         print("\n" + "=" * 60)
         print("🎉 Cookie extraction complete!")
-        print(f"📝 Run: scrapy runspider quotes_spider.py -o quotes.json")
+        print(f"📝 Next: Run scrapy runspider {alias}_spider.py -o {alias}.json")
         print("=" * 60)
 
 
 if __name__ == "__main__":
-    # Get URL from command line argument
-    if len(sys.argv) < 2:
-        print("❌ Error: Missing URL argument!")
-        print("\nUsage: python3 extract_cookies.py <login_url>")
-        print("Example: python3 extract_cookies.py http://quotes.toscrape.com/login")
+    # Get alias and URL from command line arguments
+    if len(sys.argv) < 3:
+        print("❌ Error: Missing arguments!")
+        print("\nUsage: python3 extract_cookies.py <alias> <login_url>")
+        print("Example: python3 extract_cookies.py quotes http://quotes.toscrape.com/login")
         sys.exit(1)
     
-    login_url = sys.argv[1]
-    extract_cookies(login_url)
+    alias = sys.argv[1]
+    login_url = sys.argv[2]
+    extract_cookies(alias, login_url)

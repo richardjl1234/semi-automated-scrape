@@ -9,9 +9,9 @@ Anti-detection features implemented:
 - Proper headers mimicry
 
 Usage:
-    scrapy runspider quotes_spider.py -o quotes.json
+    scrapy runspider quotes/spiders/quotes_spider.py -o quotes.json
 
-The spider will use cookies from cookies.json (extracted by extract_cookies.py)
+The spider will use cookies from quotes/cookies.json (extracted by extract_cookies.py)
 """
 
 import json
@@ -25,8 +25,10 @@ from scrapy_playwright.page import PageMethod
 # Create logger for this module
 logger = logging.getLogger(__name__)
 
-COOKIES_FILE = "cookies.json"
-JOBDIR = ".scrapy"  # Directory for checkpoint files
+# Website alias
+ALIAS = "quotes"
+COOKIES_FILE = f"{ALIAS}/cookies.json"
+JOBDIR = f"{ALIAS}/.scrapy"  # Website-specific directory for checkpoint files
 PAGES_FILE = os.path.join(JOBDIR, "scraped_pages.json")
 
 # User-Agent rotation list
@@ -65,7 +67,7 @@ def get_random_user_agent():
 
 
 class QuotesSpider(scrapy.Spider):
-    name = "quotes"
+    name = ALIAS
     allowed_domains = ["quotes.toscrape.com"]
     
     # Target URL - start from the main quotes page after login
@@ -91,6 +93,35 @@ class QuotesSpider(scrapy.Spider):
         'LOG_LEVEL': 'INFO',
     }
 
+    def __init__(self, *args, **kwargs):
+        """Initialize spider with request counter and checkpoint tracking"""
+        super().__init__(*args, **kwargs)
+        self.request_count = 0
+        self.quotes_extracted = 0
+        
+        # Create job directory for this website
+        if not os.path.exists(JOBDIR):
+            os.makedirs(JOBDIR)
+        
+        # Load checkpoint - track scraped pages
+        self.scraped_pages = self.load_scraped_pages()
+        
+        logger.info("=== Anti-Detection Configuration ===")
+        logger.info("DOWNLOAD_DELAY: 2 seconds")
+        logger.info("RANDOMIZE_DOWNLOAD_DELAY: True")
+        logger.info("CONCURRENT_REQUESTS_PER_DOMAIN: 2")
+        logger.info("AUTOTHROTTLE_ENABLED: True (start delay: 2s)")
+        logger.info("PLAYWRIGHT_ENABLED: True (headless browser)")
+        logger.info("Playwright stealth: ENABLED (playwright-stealth package)")
+        logger.info("Playwright stealth args:")
+        logger.info("  - --disable-blink-features=AutomationControlled")
+        logger.info("  - --disable-dev-shm-usage")
+        logger.info("  - --disable-gpu")
+        logger.info("  - --window-size=1920,1080")
+        logger.info("User-Agent pool size: %d", len(USER_AGENTS))
+        logger.info("Progress will be saved to: %s", JOBDIR)
+        logger.info("======================================")
+
     def load_scraped_pages(self):
         """Load list of already scraped pages from checkpoint file"""
         if os.path.exists(PAGES_FILE):
@@ -113,35 +144,6 @@ class QuotesSpider(scrapy.Spider):
             logger.debug("💾 Saved checkpoint: %d pages scraped", len(self.scraped_pages))
         except Exception as e:
             logger.error("Could not save checkpoint: %s", e)
-
-    def __init__(self, *args, **kwargs):
-        """Initialize spider with request counter and checkpoint tracking"""
-        super().__init__(*args, **kwargs)
-        self.request_count = 0
-        self.quotes_extracted = 0
-        
-        # Load checkpoint - track scraped pages
-        self.scraped_pages = self.load_scraped_pages()
-        
-        # Create job directory if not exists
-        if not os.path.exists(JOBDIR):
-            os.makedirs(JOBDIR)
-        
-        logger.info("=== Anti-Detection Configuration ===")
-        logger.info("DOWNLOAD_DELAY: 2 seconds")
-        logger.info("RANDOMIZE_DOWNLOAD_DELAY: True")
-        logger.info("CONCURRENT_REQUESTS_PER_DOMAIN: 2")
-        logger.info("AUTOTHROTTLE_ENABLED: True (start delay: 2s)")
-        logger.info("PLAYWRIGHT_ENABLED: True (headless browser)")
-        logger.info("Playwright stealth: ENABLED (playwright-stealth package)")
-        logger.info("Playwright stealth args:")
-        logger.info("  - --disable-blink-features=AutomationControlled")
-        logger.info("  - --disable-dev-shm-usage")
-        logger.info("  - --disable-gpu")
-        logger.info("  - --window-size=1920,1080")
-        logger.info("  - Additional stealth args for browser fingerprinting")
-        logger.info("User-Agent pool size: %d", len(USER_AGENTS))
-        logger.info("======================================")
 
     def get_stealth_headers(self):
         """Get headers with rotated User-Agent"""
@@ -256,7 +258,7 @@ class QuotesSpider(scrapy.Spider):
                 )
         else:
             logger.warning("No cookies found at %s - proceeding without authentication", COOKIES_FILE)
-            logger.info("Please run: python3 extract_cookies.py to generate cookies")
+            logger.info("Please run: python3 extract_cookies.py quotes http://quotes.toscrape.com/login to generate cookies")
             
             for url in self.start_urls:
                 self.request_count += 1
@@ -318,7 +320,7 @@ class QuotesSpider(scrapy.Spider):
         # Check if we're logged in
         if "login" in response.url.lower():
             logger.warning("Redirected to login page! Cookies may be invalid or expired")
-            logger.info("Please re-run: python3 extract_cookies.py to refresh cookies")
+            logger.info("Please re-run: python3 extract_cookies.py quotes http://quotes.toscrape.com/login to refresh cookies")
             if page:
                 await page.close()
             return

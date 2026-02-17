@@ -1,325 +1,405 @@
-# 🍀 Semi-Automated Web Scraping Project
+# 🍀 Semi-Automated Multi-Website Scraping Project
 
-This project supports two workflows:
-1. **Local**: Run everything on your machine
-2. **Local + Cloud Server**: Extract cookies locally, scrape on server
-
-This guide explains the recommended **Local + Cloud Server** workflow for 24/7 scraping.
+This project supports scraping multiple websites with a reusable framework. Each website has its own spider, settings, and output directories.
 
 ## 📁 Project Structure
 
 ```
 python-scrape/
-├── extract_cookies.py      # Extract cookies from logged-in browser
-├── quotes_spider.py        # Scrapy spider for quotes.toscrape.com
+├── extract_cookies.py           # Generic cookie extractor (works for any website)
 ├── quotes/
-│   └── settings.py         # Scrapy settings
-├── scrapy.cfg             # Scrapy configuration
-├── cookies.json           # Extracted cookies (generated)
-├── quotes.json            # Scraped data (generated)
-├── scrapy.log             # Scrapy log file (generated)
-└── requirements.txt       # Python dependencies
+│   ├── __init__.py
+│   ├── settings.py              # Scrapy settings for quotes
+│   ├── .scrapy/                # Progress/checkpoint files (gitignored)
+│   │   └── scraped_pages.json
+│   ├── cookies.json             # Cookies extracted by extract_cookies.py
+│   └── spiders/
+│       ├── __init__.py
+│       └── quotes_spider.py     # Spider for quotes.toscrape.com
+├── huawei/
+│   ├── __init__.py
+│   ├── settings.py              # Scrapy settings for huawei
+│   ├── .scrapy/                 # Progress/checkpoint files (gitignored)
+│   │   └── scraped_pages.json
+│   ├── cookies.json              # Cookies extracted by extract_cookies.py
+│   └── spiders/
+│       ├── __init__.py
+│       └── huawei_spider.py    # Spider for cloud.huawei.com
+├── scrapy.cfg                  # Scrapy configuration
+├── .gitignore
+└── requirements.txt
 ```
 
 ## 🚀 Quick Start
 
-### Step 1: Extract Cookies
+### Step 1: Extract Cookies for a Website
 
 ```bash
-cd /home/richard/shared/jianglei/openclaw/python-scrape
-python3 extract_cookies.py http://quotes.toscrape.com/login
+# For quotes website
+python3 extract_cookies.py quotes http://quotes.toscrape.com/login
+
+# For huawei website
+python3 extract_cookies.py huawei https://cloud.huawei.com/login
 ```
 
 This will:
 - Launch Chrome browser and open the login page
 - Wait for you to enter username and password
 - After login, press Enter to extract cookies
-- Save cookies to `cookies.json`
+- Save cookies to `{alias}/cookies.json`
 
-### Step 3: Run the Spider
+### Step 2: Run the Spider
 
 ```bash
-cd /home/richard/shared/jianglei/openclaw/python-scrape
-scrapy runspider quotes_spider.py -o quotes.json
+# For quotes website
+scrapy runspider quotes/spiders/quotes_spider.py -o quotes.json
+
+# For huawei website
+scrapy runspider huawei/spiders/huawei_spider.py -o huawei.json
+
+# With max images limit (for huawei)
+scrapy runspider huawei/spiders/huawei_spider.py -a max_images=50 -o huawei.json
+scrapy runspider huawei/spiders/huawei_spider.py -a max_images=-1 -o huawei.json  # Unlimited
 ```
 
 ---
 
-## ☁️ Local + Cloud Server Workflow (Recommended)
+## 🆕 How to Create a Spider for a New Website
 
-This workflow is ideal when you want to scrape on a cloud server without GUI.
+Follow these steps to add a new website to the project:
 
-### Architecture
-
-```mermaid
-flowchart TB
-    subgraph Local["Local Machine (with GUI)"]
-        A[Browser] -->|1. Login| B[quotes.toscrape.com]
-        B -->|2. Set Cookie| A
-        C[extract_cookies.py] -->|3. Launch Browser| A
-        A -->|4. Extract Cookies| C
-        C -->|5. Save| D[cookies.json]
-    end
-
-    D -.->|6. Copy to Server| E["Cloud Server (no GUI)"]
-    
-    subgraph Server["Cloud Server"]
-        E --> F[scrapy runspider]
-        F -->|7. Use cookies| G[quotes.toscrape.com]
-        G -->|8. Return Data| F
-        F -->|9. Save| H[quotes.json]
-    end
-    
-    style Local fill:#e1f5fe
-    style Server fill:#e8f5e8
-```
-
-### Step-by-Step Guide
-
-#### Step 1: On Local Machine (with GUI)
+### Step 1: Create the Website Directory Structure
 
 ```bash
-# Extract cookies
-python3 extract_cookies.py http://quotes.toscrape.com/login
+# Create the project structure
+mkdir -p {alias}/spiders
+touch {alias}/__init__.py
+touch {alias}/settings.py
+touch {alias}/spiders/__init__.py
 ```
 
-After login, the cookies will be saved to `cookies.json`.
+Example for `example.com`:
+```bash
+mkdir -p example/spiders
+touch example/__init__.py
+touch example/settings.py
+touch example/spiders/__init__.py
+```
 
-#### Step 2: Copy to Cloud Server
+### Step 2: Create the Settings File
+
+Copy `quotes/settings.py` to `example/settings.py` and modify:
+
+```python
+# example/settings.py
+BOT_NAME = "example"
+
+SPIDER_MODULES = ["example.spiders"]
+NEWSPIDER_MODULE = "example.spiders"
+
+# Update logging
+LOG_FILE = "example.log"
+```
+
+### Step 3: Create the Spider
+
+Copy `quotes/spiders/quotes_spider.py` to `example/spiders/example_spider.py` and modify:
+
+```python
+# example/spiders/example_spider.py
+
+# Update module name in PLAYWRIGHT_PAGE_INIT_CALLBACK
+'PLAYWRIGHT_PAGE_INIT_CALLBACK': 'example_spider.ExampleSpider.playwright_page_init',
+
+class ExampleSpider(scrapy.Spider):
+    name = ALIAS  # Use "example" as alias
+    allowed_domains = ["example.com"]
+    start_urls = ["https://example.com/protected-page"]
+```
+
+### Step 4: Extract Cookies
 
 ```bash
-# Using scp (Secure Copy)
-scp cookies.json user@your-server:/path/to/project/
-
-# Or using rsync
-rsync -avz cookies.json user@your-server:/path/to/project/
+python3 extract_cookies.py example https://example.com/login
 ```
 
-#### Step 3: On Cloud Server
+This will create `example/cookies.json` and the `example/.scrapy/` directory.
+
+### Step 5: Run the Spider
 
 ```bash
-# Run the spider (headless, no GUI needed)
-scrapy runspider quotes_spider.py -o quotes.json
+scrapy runspider example/spiders/example_spider.py -o example.json
 ```
-
-### Why This Works
-
-| Component | Local Machine | Cloud Server |
-|-----------|-------------|-------------|
-| GUI Required | ✅ Yes | ❌ No |
-| Browser | Chrome (manual) | Playwright (headless) |
-| Login | Manual | Automatic (cookies) |
-| Runs 24/7 | ❌ No | ✅ Yes |
 
 ---
 
-## 📝 Workflow (Single Machine)
+## 📋 Spider Creation Template
 
-### Phase 1: Login & Cookie Extraction
-```
-User → Opens Chrome → Goes to quotes.toscrape.com/login → Logs in
-Agent → Runs extract_cookies.py → Gets cookies → Saves to cookies.json
-```
-
-### Phase 2: Page Structure Investigation
-```
-Agent → Uses Playwright to inspect page
-     → Identifies CSS selectors for quotes
-     → Works with user to refine selectors
-     → Updates quotes_spider.py with correct selectors
-```
-
-### Phase 3: Scraping
-```
-Spider → Loads cookies.json
-      → Starts from logged-in URL
-      → Scrapes all pages
-      → Exports to quotes.json
-```
-
-## 🔧 Configuration
-
-### Changing the Target Website
-
-Edit `quotes_spider.py`:
+Use this template when creating a new spider:
 
 ```python
-class QuotesSpider(scrapy.Spider):
-    name = "quotes"
-    allowed_domains = ["your-target-domain.com"]
-    start_urls = ["http://your-target-domain.com/protected-page"]
-```
+"""
+{Website Name} Spider - Scrapy Spider for {domain.com}
 
-### Adding More Data Fields
+This spider starts from a logged-in state by using cookies from extract_cookies.py
+Anti-detection features implemented:
+- User-Agent rotation
+- Random delays between requests
+- Playwright for JavaScript rendering (real browser)
+- Proper headers mimicry
 
-Edit the `parse` method in `quotes_spider.py`:
+Usage:
+    scrapy runspider {alias}/spiders/{alias}_spider.py -o {alias}.json
 
-```python
-for quote in quotes:
-    item = {
-        'text': quote.css('span.text::text').get(),
-        'author': quote.css('span small::text').get(),
-        'tags': quote.css('div.tags a.tag::text').getall(),
-        # Add more fields here
-        'date_added': quote.css('::attr(data-date)').get(),
+The spider will use cookies from {alias}/cookies.json (extracted by extract_cookies.py)
+"""
+
+import json
+import logging
+import os
+import random
+import asyncio
+import scrapy
+from scrapy_playwright.page import PageMethod
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
+
+# Website alias
+ALIAS = "{alias}"
+COOKIES_FILE = f"{ALIAS}/cookies.json"
+JOBDIR = f"{ALIAS}/.scrapy"  # Website-specific directory
+PAGES_FILE = os.path.join(JOBDIR, "scraped_pages.json")
+IMAGES_DIR = f"result/{ALIAS}"  # Only for image scraping
+
+# User-Agent rotation list
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...",
+    # Add more User-Agents...
+]
+
+def get_random_headers():
+    """Generate random browser headers"""
+    return {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,...',
+        'Accept-Language': f'en-US,en;q={random.uniform(0.8, 1.0):.1f}',
+        # Add more headers...
     }
-    yield item
+
+def get_random_user_agent():
+    return random.choice(USER_AGENTS)
+
+class {CamelCase}Spider(scrapy.Spider):
+    name = ALIAS
+    allowed_domains = ["{domain.com}"]
+    
+    start_urls = ["https://{domain.com}/target-page"]
+    
+    custom_settings = {
+        'DOWNLOAD_DELAY': 3,
+        'RANDOMIZE_DOWNLOAD_DELAY': True,
+        'CONCURRENT_REQUESTS_PER_DOMAIN': 1,
+        'PLAYWRIGHT_ENABLED': True,
+        'PLAYWRIGHT_LAUNCH_OPTIONS': {
+            'headless': True,
+            'args': [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--window-size=1920,1080',
+            ],
+        },
+        'PLAYWRIGHT_PAGE_INIT_CALLBACK': '{alias}_spider.{CamelCase}Spider.playwright_page_init',
+        'AUTOTHROTTLE_ENABLED': True,
+        'AUTOTHROTTLE_START_DELAY': 3,
+        'LOG_LEVEL': 'INFO',
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.request_count = 0
+        self.items_extracted = 0
+        
+        # Create directories
+        if not os.path.exists(JOBDIR):
+            os.makedirs(JOBDIR)
+        if not os.path.exists(IMAGES_DIR):
+            os.makedirs(IMAGES_DIR)
+        
+        # Load checkpoint
+        self.scraped_pages = self.load_scraped_pages()
+
+    def load_scraped_pages(self):
+        if os.path.exists(PAGES_FILE):
+            try:
+                with open(PAGES_FILE, 'r') as f:
+                    pages = json.load(f)
+                logger.info("📂 Loaded checkpoint: %d pages already scraped", len(pages))
+                return set(pages)
+            except Exception as e:
+                logger.warning("Could not load checkpoint file: %s", e)
+        return set()
+    
+    def save_scraped_pages(self):
+        try:
+            os.makedirs(JOBDIR, exist_ok=True)
+            with open(PAGES_FILE, 'w') as f:
+                json.dump(list(self.scraped_pages), f)
+        except Exception as e:
+            logger.error("Could not save checkpoint: %s", e)
+
+    def get_stealth_headers(self):
+        headers = get_random_headers()
+        ua = get_random_user_agent()
+        headers['User-Agent'] = ua
+        return headers
+
+    async def playwright_page_init(self, page, request):
+        """Apply stealth to each new page"""
+        await page.add_init_script("""
+            () => {
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+                window.chrome = { runtime: {} };
+            }
+        """)
+
+    def start_requests(self):
+        """Load cookies and start requests from logged-in state"""
+        if os.path.exists(COOKIES_FILE):
+            with open(COOKIES_FILE, 'r') as f:
+                cookies = json.load(f)
+            
+            for url in self.start_urls:
+                self.request_count += 1
+                headers = self.get_stealth_headers()
+                yield scrapy.Request(
+                    url=url,
+                    cookies=cookies,
+                    headers=headers,
+                    callback=self.parse,
+                    errback=self.errback,
+                    meta={
+                        'playwright': True,
+                        'playwright_include_page': True,
+                        'playwright_page_init_callback': self.playwright_page_init,
+                    }
+                )
+        else:
+            logger.warning("No cookies found at %s", COOKIES_FILE)
+            logger.info("Please run: python3 extract_cookies.py %s <login_url>", ALIAS)
+
+    async def parse(self, response):
+        """Parse the page and extract data"""
+        page = response.meta.get('playwright_page')
+        
+        # Skip if already scraped
+        if response.url in self.scraped_pages:
+            logger.info("⏭️  Skipping already scraped page: %s", response.url)
+            if page:
+                await page.close()
+            return
+        
+        logger.info("Parsing: %s (status: %d)", response.url, response.status)
+        
+        # Check if logged in
+        if "login" in response.url.lower():
+            logger.warning("Redirected to login page! Cookies may be invalid")
+            if page:
+                await page.close()
+            return
+        
+        # Extract data - UPDATE THIS PART FOR YOUR WEBSITE
+        items = response.css('div.item')  # Replace with actual selector
+        
+        for item in items:
+            data = {
+                'title': item.css('h2.title::text').get(),
+                'url': response.url,
+                # Add more fields...
+            }
+            self.items_extracted += 1
+            yield data
+        
+        # Follow pagination - UPDATE THIS PART FOR YOUR WEBSITE
+        next_page = response.css('a.next::attr(href)').get()
+        if next_page:
+            next_url = response.urljoin(next_page)
+            delay = random.uniform(1.5, 3.0)
+            await asyncio.sleep(delay)
+            
+            if os.path.exists(COOKIES_FILE):
+                with open(COOKIES_FILE, 'r') as f:
+                    cookies = json.load(f)
+                self.request_count += 1
+                headers = self.get_stealth_headers()
+                yield scrapy.Request(
+                    url=next_url,
+                    cookies=cookies,
+                    headers=headers,
+                    callback=self.parse,
+                    meta={
+                        'playwright': True,
+                        'playwright_include_page': True,
+                        'playwright_page_init_callback': self.playwright_page_init,
+                    }
+                )
+        
+        # Mark page as scraped
+        self.scraped_pages.add(response.url)
+        self.save_scraped_pages()
+        
+        logger.info("Total items extracted so far: %d", self.items_extracted)
+        
+        if page:
+            await page.close()
+
+    async def errback(self, failure):
+        """Handle errors"""
+        page = failure.request.meta.get('playwright_page')
+        if page:
+            await page.close()
+        logger.error("Request failed: %s", failure.value)
 ```
+
+---
 
 ## 🛡️ Anti-Detection Features
-
-This project includes multiple anti-detection features to avoid being blocked:
 
 | Feature | Description |
 |---------|-------------|
 | **User-Agent Rotation** | 8 different browser User-Agents rotate per request |
 | **Playwright Stealth** | Uses playwright-stealth to hide automation flags |
 | **Real Browser Rendering** | Uses headless Chrome (not raw HTTP) |
-| **Request Delays** | 2 second delay between requests (randomized) |
+| **Request Delays** | 2-3 second delay between requests (randomized) |
 | **AutoThrottle** | Automatically adjusts speed based on server response |
 | **Proper Headers** | Mimics real browser headers (Accept, Sec-Fetch-*, etc.) |
 
-### Log Levels
-
-```bash
-# Standard output (INFO level - shows progress)
-scrapy runspider quotes_spider.py -o quotes.json
-
-# Debug output (DEBUG level - shows all details including rotated User-Agents)
-scrapy runspider quotes_spider.py -o quotes.json --loglevel=DEBUG
-
-# View log file
-cat scrapy.log
-```
-
 ## 💾 Checkpoint / Resume (断点续传)
 
-The spider automatically saves its progress and can resume from where it left off if interrupted.
+The spider automatically saves its progress:
 
-### How It Works
-
-| Step | Action |
-|------|--------|
-| **Load** | On startup, loads previously scraped pages from checkpoint file |
-| **Skip** | Skips pages that are already in checkpoint |
-| **Save** | After each page is processed, saves URL to checkpoint |
-| **Resume** | If interrupted, just run again - it resumes automatically |
-
-### Checkpoint File
-
-- Location: `.scrapy/scraped_pages.json`
-- Stores list of already scraped page URLs
-
-### Usage
+- **Checkpoint Directory**: `{alias}/.scrapy/`
+- **Checkpoint File**: `scraped_pages.json`
 
 ```bash
-# Run the spider (creates checkpoint automatically)
-scrapy runspider quotes_spider.py -o quotes.json
-
-# If interrupted, just run again - it will resume from where it left off
-scrapy runspider quotes_spider.py -o quotes.json
-
 # View checkpoint status
-cat .scrapy/scraped_pages.json
+cat {alias}/.scrapy/scraped_pages.json
 
 # To start fresh (delete checkpoint)
-rm -rf .scrapy/
-```
-
-### Example
-
-```
-# First run - scrapes all pages
-📂 Loaded checkpoint: 0 pages already scraped
-✅ Page saved to checkpoint: http://quotes.toscrape.com/
-...
-Final stats - Requests: 10, Quotes: 100
-
-# Second run - resumes from checkpoint
-📂 Loaded checkpoint: 10 pages already scraped
-⏭️ Skipping already scraped page: http://quotes.toscrape.com/
-⏭️ Next page also already scraped: http://quotes.toscrape.com/page/2/
-```
-
-## 🚀 Future Improvements & Production Recommendations
-
-The current solution works well for learning and testing. For production scraping, consider these enhancements:
-
-### Current Solution Assessment
-
-| Feature | Status |
-|---------|--------|
-| Cookie extraction | ✅ Working |
-| Playwright browser | ✅ Working |
-| Anti-detection (User-Agent, headers, stealth) | ✅ Working |
-| Checkpoint/Resume | ✅ Working |
-| Logging | ✅ Working |
-| Pagination | ✅ Working |
-
----
-
-### ⚠️ Potential Improvements
-
-#### 1. **IP Rotation** (High Priority for Production)
-- **Current**: Single IP address
-- **Risk**: Gets blocked if too many requests
-- **Solution**: Use residential proxies (Bright Data, Oxylabs, SmartProxy)
-
-#### 2. **TLS Fingerprinting** (Medium Priority)
-- **Current**: Uses real browser TLS (good)
-- **Risk**: Sophisticated anti-bot services can detect Python's TLS stack
-- **Solution**: Use `curl-cffi` or `undetected-chromedriver`
-
-#### 3. **Cookie Auto-Refresh** (Nice to Have)
-- **Current**: Manual re-extraction required
-- **Enhancement**: Automatically refresh when session expires
-
-#### 4. **Enhanced Error Handling** (Nice to Have)
-- Add retry logic for failed pages
-- Save partial results immediately
-
----
-
-### 🎯 Recommendation
-
-| Use Case | Solution |
-|----------|----------|
-| **quotes.toscrape.com** (test site) | Current solution is sufficient |
-| **Real production sites** | Add IP rotation + TLS fingerprinting + error handling |
-
----
-
-### 📦 Additional Dependencies (Optional)
-
-```bash
-# IP Rotation (proxy integration)
-pip3 install scrapy-proxy-pool
-
-# Better TLS mimicry
-pip3 install curl-cffi
-
-# Hardened Chrome (undetectable)
-pip3 install undetected-chromedriver
+rm -rf {alias}/.scrapy/
 ```
 
 ---
 
-## 🛠️ Installation
+## 📦 Installation
 
-Install dependencies:
 ```bash
 pip3 install playwright scrapy scrapy-playwright playwright-stealth
 ```
 
-Using system Chrome (already installed):
-```bash
-# No need to download Chromium - using system Google Chrome
-```
-
-Verify installation:
-```bash
-python3 test_install.py
-```
+---
 
 ## ⚠️ Important Notes
 
@@ -328,6 +408,8 @@ python3 test_install.py
 3. **Legal considerations** - Only scrape sites you have permission to access
 4. **Session expiry** - Cookies may expire; re-run extract_cookies.py if needed
 5. **Anti-detection** - This project uses stealth techniques; use responsibly
+
+---
 
 ## 📚 Resources
 
