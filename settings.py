@@ -137,5 +137,5 @@ HTTP_COMPRESSION_ENABLED = True
 
 # Retry settings
 RETRY_ENABLED = True
-RETRY_TIMES = 3
-RETRY_HTTP_CODES = [500, 502, 503, 504, 408, 429]
+RETRY_TIMES = 5  # Increased from 3 to 5 for more resilience
+RETRY_HTTP_CODES = [500, 502, 503, 504, 408, 429, 460, 499]
