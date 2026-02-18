@@ -194,29 +194,14 @@ def load_next_url_func(func_path):
 class CommonSpider(scrapy.Spider):
     name = "common_spider"
 
+    # NOTE: When using scrapy runspider, settings from settings.py may not be fully loaded.
+    # To ensure consistent behavior, key Playwright settings are defined here in custom_settings.
+    # These will override any settings from settings.py (which is correct behavior).
+    # Only spider-specific settings (like callbacks) should be unique to the spider.
     custom_settings = {
-        'DOWNLOAD_DELAY': 2,
-        'RANDOMIZE_DOWNLOAD_DELAY': True,
-        'CONCURRENT_REQUESTS_PER_DOMAIN': 2,
-        'PLAYWRIGHT_ENABLED': True,
-        'PLAYWRIGHT_LAUNCH_OPTIONS': {
-            'headless': True,
-            'args': [
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--window-size=1920,1080',
-            ],
-        },
-        'PLAYWRIGHT_PAGE_GOTO_OPTIONS': {
-            'wait_until': 'domcontentloaded',
-            'timeout': 60000,
-        },
-        'PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT': 60000,
+        # Keep minimal settings here - most are inherited from settings.py
+        # The callback must point to this spider's method
         'PLAYWRIGHT_PAGE_INIT_CALLBACK': 'spider.CommonSpider.playwright_page_init',
-        'AUTOTHROTTLE_ENABLED': True,
-        'AUTOTHROTTLE_START_DELAY': 2,
-        'LOG_LEVEL': 'INFO',
     }
 
     def __init__(self, alias=None, *args, **kwargs):
