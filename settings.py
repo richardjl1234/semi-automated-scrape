@@ -115,8 +115,8 @@ PLAYWRIGHT_LAUNCH_OPTIONS = {
 
 # Inject stealth script to hide automation
 PLAYWRIGHT_PAGE_GOTO_OPTIONS = {
-    "wait_until": "networkidle",
-    "timeout": 60000,  # Increased to 60 seconds for slow networks
+    "wait_until": "domcontentloaded",  # Changed from networkidle for better compatibility with slow networks
+    "timeout": 60000,
 }
 
 PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 60000  # Increased to 60 seconds
