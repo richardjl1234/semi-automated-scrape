@@ -80,9 +80,14 @@ DOWNLOAD_HANDLERS = {
 
 # Playwright settings - Stealth mode
 PLAYWRIGHT_BROWSER_TYPE = "chromium"
+
+# Try to find Chrome executable, fallback to default
+import shutil
+CHROME_PATH = shutil.which("chromium") or shutil.which("google-chrome") or shutil.which("chromium-browser") or None
+
 PLAYWRIGHT_LAUNCH_OPTIONS = {
     "headless": True,
-    "executable_path": "/usr/bin/google-chrome",
+    "executable_path": CHROME_PATH,
     "args": [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -111,10 +116,10 @@ PLAYWRIGHT_LAUNCH_OPTIONS = {
 # Inject stealth script to hide automation
 PLAYWRIGHT_PAGE_GOTO_OPTIONS = {
     "wait_until": "networkidle",
-    "timeout": 30000,
+    "timeout": 60000,  # Increased to 60 seconds for slow networks
 }
 
-PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30000
+PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 60000  # Increased to 60 seconds
 
 # Enable and configure the AutoThrottle extension
 AUTOTHROTTLE_ENABLED = True
