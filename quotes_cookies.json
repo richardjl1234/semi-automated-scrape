@@ -1,0 +1,12 @@
+[
+  {
+    "name": "session",
+    "value": "eyJjc3JmX3Rva2VuIjoiR1NMSVRsaEFKT3dadW5iUmdOWFljVmlNZGpGZnBDdGVQSG1VV3Nya3ZhUXhLQnpFcURveSIsInVzZXJuYW1lIjoiYWRtaW4ifQ.aZSTGA.R6IL98l3prnBRKLBu97GwKEEpQs",
+    "domain": "quotes.toscrape.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  }
+]

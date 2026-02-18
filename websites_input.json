@@ -1,0 +1,18 @@
+[
+    {
+        "alias": "quotes",
+        "login_url": "http://quotes.toscrape.com/login",
+        "start_url": "http://quotes.toscrape.com/",
+        "next_url_func": "next_url_funcs.quote_next_url_func.quote_next_url",
+        "output_path": "result/quotes",
+        "chunked_size": 0,
+        "speed_override": {
+            "download_delay": 0.5,
+            "autothrottle_enabled": false,
+            "concurrent_requests": 4
+        },
+        "allowed_domains": [
+            "quotes.toscrape.com"
+        ]
+    }
+]

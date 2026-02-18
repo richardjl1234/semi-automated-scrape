@@ -1,11 +1,11 @@
-# Scrapy settings for quotes project
+# Scrapy Settings - Common for all websites
 
 import logging
 
-BOT_NAME = "quotes"
+BOT_NAME = "common_scraper"
 
-SPIDER_MODULES = ["quotes.spiders"]
-NEWSPIDER_MODULE = "quotes.spiders"
+SPIDER_MODULES = ["spiders"]
+NEWSPIDER_MODULE = "spiders"
 
 # ============================================
 # LOGGING SETTINGS
@@ -66,7 +66,7 @@ ROBOTSTXT_OBEY = False
 CONCURRENT_REQUESTS = 1
 
 # Configure a delay for requests
-DOWNLOAD_DELAY = 300
+DOWNLOAD_DELAY =1 
 RANDOMIZE_DOWNLOAD_DELAY = True
 
 # Disable cookies (enabled for login functionality)
@@ -107,6 +107,7 @@ PLAYWRIGHT_LAUNCH_OPTIONS = {
         "--no-first-run",
     ],
 }
+
 # Inject stealth script to hide automation
 PLAYWRIGHT_PAGE_GOTO_OPTIONS = {
     "wait_until": "networkidle",

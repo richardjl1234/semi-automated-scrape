@@ -1,367 +1,188 @@
 # 🍀 Semi-Automated Multi-Website Scraping Project
 
-This project supports scraping multiple websites with a reusable framework. Each website has its own spider, settings, and output directories.
+This project supports scraping multiple websites with a reusable framework. Each website is configured in `websites_input.json` and uses a common spider with website-specific next_url functions.
 
 ## 📁 Project Structure
 
 ```
 python-scrape/
-├── extract_cookies.py           # Generic cookie extractor (works for any website)
-├── quotes/
+├── scrapy.cfg                      # Scrapy configuration
+├── settings.py                      # Common Scrapy settings for all websites
+├── websites_input.json              # Website configuration file
+├── extract_cookies.py              # Generic cookie extractor (reads from websites_input.json)
+├── spider.py                       # Common spider (takes alias as argument)
+├── next_url_funcs/                 # Website-specific next URL generation functions
 │   ├── __init__.py
-│   ├── settings.py              # Scrapy settings for quotes
-│   ├── .scrapy/                # Progress/checkpoint files (gitignored)
-│   │   └── scraped_pages.json
-│   ├── cookies.json             # Cookies extracted by extract_cookies.py
-│   └── spiders/
-│       ├── __init__.py
-│       └── quotes_spider.py     # Spider for quotes.toscrape.com
-├── huawei/
-│   ├── __init__.py
-│   ├── settings.py              # Scrapy settings for huawei
-│   ├── .scrapy/                 # Progress/checkpoint files (gitignored)
-│   │   └── scraped_pages.json
-│   ├── cookies.json              # Cookies extracted by extract_cookies.py
-│   └── spiders/
-│       ├── __init__.py
-│       └── huawei_spider.py    # Spider for cloud.huawei.com
-├── scrapy.cfg                  # Scrapy configuration
+│   └── quote_next_url_func.py      # Next URL function for quotes.toscrape.com
+├── quotes_cookies.json             # Cookies extracted by extract_cookies.py
+├── quotes.json                     # Scraped output (or chunked files: quotes_0.json, quotes_1.json, etc.)
+├── .scrapy/                       # Progress/checkpoint files (gitignored)
+│   └── quotes_scraped_pages.json   # Checkpoint file (prefixed with alias)
 ├── .gitignore
 └── requirements.txt
 ```
 
 ## 🚀 Quick Start
 
-### Step 1: Extract Cookies for a Website
+### Step 1: Configure the Website
+
+Add your website to `websites_input.json`:
+
+```json
+[
+    {
+        "alias": "quotes",
+        "login_url": "http://quotes.toscrape.com/login",
+        "start_url": "http://quotes.toscrape.com/",
+        "next_url_func": "next_url_funcs.quote_next_url_func.quote_next_url",
+        "output_path": "quotes",
+        "chunked_size": 0,
+        "allowed_domains": ["quotes.toscrape.com"]
+    }
+]
+```
+
+### Step 2: Extract Cookies for a Website
 
 ```bash
-# For quotes website
-python3 extract_cookies.py quotes http://quotes.toscrape.com/login
+# With alias argument:
+python3 extract_cookies.py quotes
 
-# For huawei website
-python3 extract_cookies.py huawei https://cloud.huawei.com/login
+# Interactive mode (no alias - will prompt for selection):
+python3 extract_cookies.py
 ```
 
 This will:
+- Read the alias and login_url from `websites_input.json`
 - Launch Chrome browser and open the login page
 - Wait for you to enter username and password
 - After login, press Enter to extract cookies
-- Save cookies to `{alias}/cookies.json`
+- Save cookies to `{alias}_cookies.json` (e.g., `quotes_cookies.json`)
 
-### Step 2: Run the Spider
+### Step 3: Run the Spider
 
 ```bash
-# For quotes website
-scrapy runspider quotes/spiders/quotes_spider.py -o quotes.json
+# Simplified syntax (recommended):
+python spider.py quotes
 
-# For huawei website
-scrapy runspider huawei/spiders/huawei_spider.py -o huawei.json
+# Or using scrapy runspider:
+scrapy runspider spider.py -a alias=quotes
 
-# With max images limit (for huawei)
-scrapy runspider huawei/spiders/huawei_spider.py -a max_images=50 -o huawei.json
-scrapy runspider huawei/spiders/huawei_spider.py -a max_images=-1 -o huawei.json  # Unlimited
+# Interactive mode (no alias - will prompt for selection):
+python spider.py
+```
+
+**Note:** Output file is determined by `output_path` in `websites_input.json`. No need to specify `-o` in command line.
+
+### Chunked Output
+
+If `chunked_size` is set in config, output will be split into multiple files:
+- `{output_path}_0.json`
+- `{output_path}_1.json`
+- etc.
+
+---
+
+## 📋 websites_input.json Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `alias` | string | Yes | Unique identifier for the website |
+| `login_url` | string | Yes | URL of the login page |
+| `start_url` | string | Yes | Starting URL for scraping |
+| `next_url_func` | string | Yes | Dot-path to next URL function (e.g., `next_url_funcs.quote_next_url_func.quote_next_url`) |
+| `output_path` | string | Yes | Output file path (without extension) |
+| `chunked_size` | integer | No | Number of items per chunk file (0 = no chunking, default) |
+| `allowed_domains` | array | Yes | List of allowed domains |
+
+### Chunked Output Example
+
+When `chunked_size` is set to 10:
+
+```
+quotes_0.json  # First 10 items
+quotes_1.json  # Next 10 items
+quotes_2.json  # Next 10 items
+...
+```
+
+When `chunked_size` is 0 (disabled):
+
+```
+quotes.json  # All items in a single file
 ```
 
 ---
 
-## 🆕 How to Create a Spider for a New Website
+## 🆕 How to Add a New Website
 
-Follow these steps to add a new website to the project:
+### Step 1: Create the Next URL Function
 
-### Step 1: Create the Website Directory Structure
-
-```bash
-# Create the project structure
-mkdir -p {alias}/spiders
-touch {alias}/__init__.py
-touch {alias}/settings.py
-touch {alias}/spiders/__init__.py
-```
-
-Example for `example.com`:
-```bash
-mkdir -p example/spiders
-touch example/__init__.py
-touch example/settings.py
-touch example/spiders/__init__.py
-```
-
-### Step 2: Create the Settings File
-
-Copy `quotes/settings.py` to `example/settings.py` and modify:
+Create a new file in `next_url_funcs/` with the next URL generation logic:
 
 ```python
-# example/settings.py
-BOT_NAME = "example"
+# next_url_funcs/example_next_url_func.py
 
-SPIDER_MODULES = ["example.spiders"]
-NEWSPIDER_MODULE = "example.spiders"
+def example_next_url(response):
+    """
+    Extract the next page URL from the example website pagination.
 
-# Update logging
-LOG_FILE = "example.log"
+    Args:
+        response: Scrapy Response object containing the current page
+
+    Returns:
+        str: The full URL of the next page, or None if no next page exists
+    """
+    # CSS selector to find the "next" page link
+    next_page = response.css('a.next::attr(href)').get()
+
+    if next_page:
+        next_url = response.urljoin(next_page)
+        return next_url
+
+    return None
 ```
 
-### Step 3: Create the Spider
+### Step 2: Update websites_input.json
 
-Copy `quotes/spiders/quotes_spider.py` to `example/spiders/example_spider.py` and modify:
+Add the new website configuration:
 
-```python
-# example/spiders/example_spider.py
-
-# Update module name in PLAYWRIGHT_PAGE_INIT_CALLBACK
-'PLAYWRIGHT_PAGE_INIT_CALLBACK': 'example_spider.ExampleSpider.playwright_page_init',
-
-class ExampleSpider(scrapy.Spider):
-    name = ALIAS  # Use "example" as alias
-    allowed_domains = ["example.com"]
-    start_urls = ["https://example.com/protected-page"]
-```
-
-### Step 4: Extract Cookies
-
-```bash
-python3 extract_cookies.py example https://example.com/login
-```
-
-This will create `example/cookies.json` and the `example/.scrapy/` directory.
-
-### Step 5: Run the Spider
-
-```bash
-scrapy runspider example/spiders/example_spider.py -o example.json
-```
-
----
-
-## 📋 Spider Creation Template
-
-Use this template when creating a new spider:
-
-```python
-"""
-{Website Name} Spider - Scrapy Spider for {domain.com}
-
-This spider starts from a logged-in state by using cookies from extract_cookies.py
-Anti-detection features implemented:
-- User-Agent rotation
-- Random delays between requests
-- Playwright for JavaScript rendering (real browser)
-- Proper headers mimicry
-
-Usage:
-    scrapy runspider {alias}/spiders/{alias}_spider.py -o {alias}.json
-
-The spider will use cookies from {alias}/cookies.json (extracted by extract_cookies.py)
-"""
-
-import json
-import logging
-import os
-import random
-import asyncio
-import scrapy
-from scrapy_playwright.page import PageMethod
-
-# Create logger for this module
-logger = logging.getLogger(__name__)
-
-# Website alias
-ALIAS = "{alias}"
-COOKIES_FILE = f"{ALIAS}/cookies.json"
-JOBDIR = f"{ALIAS}/.scrapy"  # Website-specific directory
-PAGES_FILE = os.path.join(JOBDIR, "scraped_pages.json")
-IMAGES_DIR = f"result/{ALIAS}"  # Only for image scraping
-
-# User-Agent rotation list
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...",
-    # Add more User-Agents...
+```json
+[
+    {
+        "alias": "quotes",
+        "login_url": "http://quotes.toscrape.com/login",
+        "start_url": "http://quotes.toscrape.com/",
+        "next_url_func": "next_url_funcs.quote_next_url_func.quote_next_url",
+        "output_path": "quotes",
+        "chunked_size": 0,
+        "allowed_domains": ["quotes.toscrape.com"]
+    },
+    {
+        "alias": "example",
+        "login_url": "https://example.com/login",
+        "start_url": "https://example.com/page/1",
+        "next_url_func": "next_url_funcs.example_next_url_func.example_next_url",
+        "output_path": "example_output",
+        "chunked_size": 50,
+        "allowed_domains": ["example.com"]
+    }
 ]
-
-def get_random_headers():
-    """Generate random browser headers"""
-    return {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,...',
-        'Accept-Language': f'en-US,en;q={random.uniform(0.8, 1.0):.1f}',
-        # Add more headers...
-    }
-
-def get_random_user_agent():
-    return random.choice(USER_AGENTS)
-
-class {CamelCase}Spider(scrapy.Spider):
-    name = ALIAS
-    allowed_domains = ["{domain.com}"]
-    
-    start_urls = ["https://{domain.com}/target-page"]
-    
-    custom_settings = {
-        'DOWNLOAD_DELAY': 3,
-        'RANDOMIZE_DOWNLOAD_DELAY': True,
-        'CONCURRENT_REQUESTS_PER_DOMAIN': 1,
-        'PLAYWRIGHT_ENABLED': True,
-        'PLAYWRIGHT_LAUNCH_OPTIONS': {
-            'headless': True,
-            'args': [
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--window-size=1920,1080',
-            ],
-        },
-        'PLAYWRIGHT_PAGE_INIT_CALLBACK': '{alias}_spider.{CamelCase}Spider.playwright_page_init',
-        'AUTOTHROTTLE_ENABLED': True,
-        'AUTOTHROTTLE_START_DELAY': 3,
-        'LOG_LEVEL': 'INFO',
-    }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.request_count = 0
-        self.items_extracted = 0
-        
-        # Create directories
-        if not os.path.exists(JOBDIR):
-            os.makedirs(JOBDIR)
-        if not os.path.exists(IMAGES_DIR):
-            os.makedirs(IMAGES_DIR)
-        
-        # Load checkpoint
-        self.scraped_pages = self.load_scraped_pages()
-
-    def load_scraped_pages(self):
-        if os.path.exists(PAGES_FILE):
-            try:
-                with open(PAGES_FILE, 'r') as f:
-                    pages = json.load(f)
-                logger.info("📂 Loaded checkpoint: %d pages already scraped", len(pages))
-                return set(pages)
-            except Exception as e:
-                logger.warning("Could not load checkpoint file: %s", e)
-        return set()
-    
-    def save_scraped_pages(self):
-        try:
-            os.makedirs(JOBDIR, exist_ok=True)
-            with open(PAGES_FILE, 'w') as f:
-                json.dump(list(self.scraped_pages), f)
-        except Exception as e:
-            logger.error("Could not save checkpoint: %s", e)
-
-    def get_stealth_headers(self):
-        headers = get_random_headers()
-        ua = get_random_user_agent()
-        headers['User-Agent'] = ua
-        return headers
-
-    async def playwright_page_init(self, page, request):
-        """Apply stealth to each new page"""
-        await page.add_init_script("""
-            () => {
-                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-                window.chrome = { runtime: {} };
-            }
-        """)
-
-    def start_requests(self):
-        """Load cookies and start requests from logged-in state"""
-        if os.path.exists(COOKIES_FILE):
-            with open(COOKIES_FILE, 'r') as f:
-                cookies = json.load(f)
-            
-            for url in self.start_urls:
-                self.request_count += 1
-                headers = self.get_stealth_headers()
-                yield scrapy.Request(
-                    url=url,
-                    cookies=cookies,
-                    headers=headers,
-                    callback=self.parse,
-                    errback=self.errback,
-                    meta={
-                        'playwright': True,
-                        'playwright_include_page': True,
-                        'playwright_page_init_callback': self.playwright_page_init,
-                    }
-                )
-        else:
-            logger.warning("No cookies found at %s", COOKIES_FILE)
-            logger.info("Please run: python3 extract_cookies.py %s <login_url>", ALIAS)
-
-    async def parse(self, response):
-        """Parse the page and extract data"""
-        page = response.meta.get('playwright_page')
-        
-        # Skip if already scraped
-        if response.url in self.scraped_pages:
-            logger.info("⏭️  Skipping already scraped page: %s", response.url)
-            if page:
-                await page.close()
-            return
-        
-        logger.info("Parsing: %s (status: %d)", response.url, response.status)
-        
-        # Check if logged in
-        if "login" in response.url.lower():
-            logger.warning("Redirected to login page! Cookies may be invalid")
-            if page:
-                await page.close()
-            return
-        
-        # Extract data - UPDATE THIS PART FOR YOUR WEBSITE
-        items = response.css('div.item')  # Replace with actual selector
-        
-        for item in items:
-            data = {
-                'title': item.css('h2.title::text').get(),
-                'url': response.url,
-                # Add more fields...
-            }
-            self.items_extracted += 1
-            yield data
-        
-        # Follow pagination - UPDATE THIS PART FOR YOUR WEBSITE
-        next_page = response.css('a.next::attr(href)').get()
-        if next_page:
-            next_url = response.urljoin(next_page)
-            delay = random.uniform(1.5, 3.0)
-            await asyncio.sleep(delay)
-            
-            if os.path.exists(COOKIES_FILE):
-                with open(COOKIES_FILE, 'r') as f:
-                    cookies = json.load(f)
-                self.request_count += 1
-                headers = self.get_stealth_headers()
-                yield scrapy.Request(
-                    url=next_url,
-                    cookies=cookies,
-                    headers=headers,
-                    callback=self.parse,
-                    meta={
-                        'playwright': True,
-                        'playwright_include_page': True,
-                        'playwright_page_init_callback': self.playwright_page_init,
-                    }
-                )
-        
-        # Mark page as scraped
-        self.scraped_pages.add(response.url)
-        self.save_scraped_pages()
-        
-        logger.info("Total items extracted so far: %d", self.items_extracted)
-        
-        if page:
-            await page.close()
-
-    async def errback(self, failure):
-        """Handle errors"""
-        page = failure.request.meta.get('playwright_page')
-        if page:
-            await page.close()
-        logger.error("Request failed: %s", failure.value)
 ```
+
+### Step 3: Extract Cookies
+
+```bash
+python3 extract_cookies.py example
+```
+
+### Step 4: Run the Spider
+
+```bash
+scrapy runspider spider.py example
+```
+
+**Note:** Output file is determined by `output_path` in `websites_input.json` (configured as `example_output`).
 
 ---
 
@@ -378,18 +199,20 @@ class {CamelCase}Spider(scrapy.Spider):
 
 ## 💾 Checkpoint / Resume (断点续传)
 
-The spider automatically saves its progress:
+The spider automatically saves its progress to prevent duplicate scraping:
 
-- **Checkpoint Directory**: `{alias}/.scrapy/`
-- **Checkpoint File**: `scraped_pages.json`
+- **Checkpoint Directory**: `.scrapy/`
+- **Checkpoint File**: `{alias}_scraped_pages.json` (e.g., `quotes_scraped_pages.json`)
 
 ```bash
 # View checkpoint status
-cat {alias}/.scrapy/scraped_pages.json
+cat .scrapy/quotes_scraped_pages.json
 
 # To start fresh (delete checkpoint)
-rm -rf {alias}/.scrapy/
+rm -rf .scrapy/
 ```
+
+**Note:** Each website has its own checkpoint file prefixed with the alias to avoid conflicts when scraping multiple websites.
 
 ---
 
