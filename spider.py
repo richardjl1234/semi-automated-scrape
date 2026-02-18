@@ -208,6 +208,11 @@ class CommonSpider(scrapy.Spider):
                 '--window-size=1920,1080',
             ],
         },
+        'PLAYWRIGHT_PAGE_GOTO_OPTIONS': {
+            'wait_until': 'domcontentloaded',
+            'timeout': 60000,
+        },
+        'PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT': 60000,
         'PLAYWRIGHT_PAGE_INIT_CALLBACK': 'spider.CommonSpider.playwright_page_init',
         'AUTOTHROTTLE_ENABLED': True,
         'AUTOTHROTTLE_START_DELAY': 2,
